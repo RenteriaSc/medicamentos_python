@@ -1,0 +1,381 @@
+ 💊  RECORDATORIO DE MEDICAMENTOS  v2.0                              
+            
+  Este documento explica cómo funciona el programa, para qué sirve
+  y cómo usarlo paso a paso.
+
+
+
+  ¿QUÉ ES ESTE PROGRAMA?
+
+  Es una aplicación que le ayuda a recordar cuándo tomar sus
+  medicamentos.
+
+    ✅  Guarda sus medicamentos con su hora y frecuencia.
+    ✅  Le avisa automáticamente cuando llega la hora de tomar uno.
+    ✅  Guarda todo aunque apague la computadora.
+
+  Es ideal para adultos mayores o cualquier persona que necesite
+  seguir un tratamiento médico con horarios fijos.
+
+
+  ¿CÓMO FUNCIONA POR DENTRO? 
+
+  Imagína que el programa es una enfermera digital que:
+
+    1.  Le pide que se identifique al entrar,
+      para que cada persona vea solo sus propios medicamentos.
+
+    2.  Guarda sus medicamentos en una libreta digital
+
+    3.  Revisa el reloj cada 30 segundos mientras está abierto.
+
+    4.  Cuando el reloj marca la hora exacta de un medicamento,
+       aparece un aviso grande en la pantalla.
+
+  Toda la información se guarda en archivos dentro de la carpeta
+  del programa. No necesita internet ni ningún servicio externo.
+
+
+  LOS ARCHIVOS QUE USA EL PROGRAMA
+
+
+  El programa crea y usa estos archivos automáticamente.
+  Usted no necesita abrirlos ni editarlos.
+
+  📄  usuarios.json
+
+  Es la lista de personas registradas en el programa.
+  Guarda el nombre de usuario y la contraseña de cada cuenta.
+  Se crea solo la primera vez que alguien crea una cuenta.
+
+  Guarda datos como estos por cada persona:
+      ┌─────────────────────────────────────────────────────┐
+      │  Usuario:    sebas                                   
+      │  Nombre:     Sebastián Renteria                    
+      │  Contraseña: 1234                                    
+      │  Registrado: 15/03/2026 10:42                       
+      └─────────────────────────────────────────────────────┘
+
+  📄  medicamentos_sebas.json  (uno por cada usuario)
+  ──────────────────────────────────────────────────────────────────────────────
+  Guarda todos los medicamentos de esa persona.
+  Cada usuario tiene su propio archivo separado.
+  Si hay dos usuarios (sebas y tomas), habrá dos archivos:
+  medicamentos_sebas.json y medicamentos_tomas.json.
+
+  Guarda datos como estos por cada medicamento:
+      ┌─────────────────────────────────────────────────────┐
+      │  Nombre:      Aspirina                               
+      │  Dosis:       500 mg                                
+      │  Primera toma: 08:00                                 
+      │  Frecuencia:  cada 8 horas                           
+      │  Horarios:    08:00, 16:00, 00:00                    
+      │  Estado:      Activo                                 
+      └─────────────────────────────────────────────────────┘
+
+  ⚠️  No borre estos archivos. Si los borra, perderá todos
+      los datos guardados y tendrá que empezar desde cero.
+
+
+  PASO A PASO: CÓMO SE USA EL PROGRAMA
+
+  ── LA PRIMERA VEZ QUE LO ABRE ──────────────────────────────────────────────
+
+  Al abrir el programa verá esta pantalla:
+
+      ════════════════════════════════════════════════════
+        💊  RECORDATORIO DE MEDICAMENTOS  v2.0
+      ════════════════════════════════════════════════════
+
+        [S]  Ya tengo una cuenta  →  Iniciar sesión
+        [N]  Soy nuevo            →  Crear cuenta
+        [0]  Salir del programa
+
+      ¿Ya tiene una cuenta? (S / N / 0) :  _
+
+  Como es la primera vez, escriba N y presione ENTER.
+  El programa le pedirá cuatro datos:
+
+    ▸ Un nombre de usuario
+      Puede ser su nombre, un apodo, lo que quiera.
+      Ejemplo: sebas, carlos, abuela1
+
+    ▸ Su nombre completo
+      Para que el menú lo salude por su nombre.
+      Puede dejarlo vacío y presionar ENTER.
+
+    ▸ Una contraseña
+      Mínimo 4 caracteres. La que usted elija.
+      Ejemplo: 1234, medi2026, casa99
+
+    ▸ Confirmar la contraseña
+      Escríbala de nuevo exactamente igual para verificar.
+
+  Listo. Su cuenta quedó creada y guardada.
+
+
+  ── INICIAR SESIÓN ──────────────────────────────────────────────────────────
+
+  La próxima vez que abra el programa, escriba S y presione ENTER.
+  Le pedirá su nombre de usuario y contraseña.
+  Si son correctos, entrará directo al menú principal.
+
+
+  ── EL MENÚ PRINCIPAL ───────────────────────────────────────────────────────
+
+  Una vez dentro verá algo así:
+
+      ════════════════════════════════════════════════════
+        💊  BIENVENIDO, SEBASTIÁN
+      ════════════════════════════════════════════════════
+        🕐  Hora actual    : 08:42  —  15/03/2026
+        📋  Medicamentos   : 2 registrado(s)
+        🔔  Recordatorios  : 🔴 INACTIVOS
+      ────────────────────────────────────────────────────
+
+           MENÚ PRINCIPAL
+
+        [1]  📝  Registrar medicamento
+        [2]  📋  Ver mis medicamentos
+        [3]  🔔  Iniciar recordatorios
+        [4]  🗑️   Eliminar medicamento
+        [5]  🔓  Cerrar sesión
+        [6]  🚪  Salir del programa
+
+      ¿Qué desea hacer? Ingrese el número:  _
+
+  Escriba el número de la opción que quiere y presione ENTER.
+
+
+  QUÉ HACE CADA OPCIÓN DEL MENÚ
+
+
+  [1]  📝  REGISTRAR MEDICAMENTO
+  ──────────────────────────────────────────────────────────────────────────────
+  Agrega un medicamento nuevo a su lista personal.
+
+  El programa le preguntará cuatro cosas:
+
+    ▸ Nombre del medicamento
+      Escríbalo como quiera: "Aspirina", "vitamina C", "Metformina".
+      No puede registrar dos medicamentos con el mismo nombre.
+
+    ▸ Dosis
+      Escriba "500 mg", "1 tableta", "10 ml", lo que corresponda.
+      Si presiona ENTER sin escribir nada, queda sin dosis indicada.
+
+    ▸ Hora de la primera toma
+      Use el formato de 24 horas: 08:00, 14:30, 21:00.
+      No use formato de 12 horas (no escriba "8am" ni "2:30pm").
+
+    ▸ Frecuencia en horas
+      Cada cuántas horas debe tomarlo. Solo escriba el número.
+      Ejemplos:
+        8  → cada 8 horas  (tomas: 08:00, 16:00, 00:00)
+        12 → cada 12 horas (tomas: 08:00, 20:00)
+        24 → una vez al día (solo: 08:00)
+
+  El programa calcula AUTOMÁTICAMENTE todos los horarios del día.
+  No tiene que calcular nada usted.
+
+  En cualquier momento puede escribir "cancelar" para volver
+  al menú sin guardar nada.
+
+
+  [2]  📋  VER MIS MEDICAMENTOS
+  ──────────────────────────────────────────────────────────────────────────────
+  Muestra la lista completa de todos sus medicamentos:
+
+      [1]  ASPIRINA  —  ✅ Activo
+      ──────────────────────────────────────────────────
+           💉 Dosis       : 500 mg
+           🕐 Hora inicio : 08:00
+           🔁 Frecuencia  : cada 8 hora(s)
+           📋 Horarios    : 08:00, 16:00, 00:00
+
+  Presione ENTER para volver al menú cuando termine de leer.
+
+
+  [3]  🔔  INICIAR RECORDATORIOS
+  ──────────────────────────────────────────────────────────────────────────────
+  Esta es la opción MÁS IMPORTANTE del programa.
+  Sin activarla, el programa NO avisará cuando toque tomar algo.
+
+  Al elegirla, el programa empieza a revisar el reloj cada 30 segundos.
+  Cuando la hora del reloj coincide con un medicamento, aparece:
+
+      ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+        ⏰  ¡RECORDATORIO DE MEDICAMENTO!
+      ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+        💊  Es hora de tomar su medicamento
+
+            🔤 Medicamento : Aspirina
+            💉 Dosis       : 500 mg
+            🕐 Hora        : 08:00
+      ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+  Después de activar los recordatorios puede seguir usando el menú
+  con normalidad. Los dos funcionan al mismo tiempo.
+
+  El encabezado del menú cambiará de:
+    🔴 INACTIVOS  →  🟢 ACTIVOS
+
+  ⚠️  El programa debe quedar abierto para que los avisos funcionen.
+      Si lo cierra, los recordatorios se detienen.
+
+
+  [4]  🗑️  ELIMINAR MEDICAMENTO
+  ──────────────────────────────────────────────────────────────────────────────
+  Borra un medicamento de su lista de forma permanente.
+
+  El programa mostrará sus medicamentos numerados.
+  Escriba el número del que quiere eliminar y presione ENTER.
+  Luego le pedirá que escriba exactamente la palabra SI para confirmar.
+
+  Si escribe cualquier otra cosa o presiona ENTER sin escribir,
+  la eliminación se cancela y no se borra nada.
+
+
+  [5]  🔓  CERRAR SESIÓN
+  ──────────────────────────────────────────────────────────────────────────────
+  Cierra su sesión y vuelve a la pantalla de inicio.
+  Útil cuando otra persona quiere usar el programa en la misma
+  computadora con su propia cuenta.
+  Sus datos quedan guardados y seguros.
+
+
+  [6]  🚪  SALIR DEL PROGRAMA
+  ──────────────────────────────────────────────────────────────────────────────
+  Cierra el programa completamente.
+  Antes de cerrar, guarda todos sus datos automáticamente.
+  La próxima vez que lo abra, todo estará tal como lo dejó.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  EJEMPLO COMPLETO DE USO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Carlos debe tomar un acetaminofen dos veces al día (mañana y noche).
+  Así usaría el programa por primera vez:
+
+  PASO 1 — Abrir el programa
+  ────────────────────────────
+  Aparece la pantalla de bienvenida con las opciones S / N / 0.
+  Carlos escribe N porque es la primera vez. Presiona ENTER.
+
+  PASO 2 — Crear la cuenta
+  ──────────────────────────
+  El programa pide los datos. Carlos escribe:
+    Nombre de usuario  → Carlos
+    Nombre completo    → Carlos Méndez
+    Contraseña         → medi2026
+    Confirmar          → medi2026
+
+  Aparece:  ✅ ¡Cuenta creada exitosamente!
+  Ahora el programa vuelve a la pantalla de S / N / 0.
+  Carlos escribe S para iniciar sesión.
+
+  PASO 3 — Iniciar sesión
+  ─────────────────────────
+  Carlos escribe su usuario (Carlos) y contraseña (medi2026).
+  Aparece:  ✅ ¡Bienvenido, Carlos Méndez!
+  Se abre el menú principal.
+
+  PASO 4 — Registrar el medicamento
+  ────────────────────────────────────
+  Carlos elige la opción 1 y escribe:
+    Nombre      → Metformina
+    Dosis       → 800 mg
+    Hora        → 07:30
+    Frecuencia  → 12
+
+  El programa calcula automáticamente: 07:30 y 19:30.
+  Aparece:  ✅ ¡Medicamento registrado!
+
+  PASO 5 — Activar los recordatorios
+  ────────────────────────────────────
+  Carlos elige la opción 3.
+  El menú ahora muestra  🟢 ACTIVOS.
+
+  PASO 6 — Esperar
+  ──────────────────
+  Carlos deja el programa abierto y sigue con su día.
+  A las 07:30 y a las 19:30 aparecerá el aviso automáticamente.
+  No necesita hacer nada más.
+
+
+
+  PREGUNTAS FRECUENTES
+
+  ¿Qué pasa si cierro el programa?
+  ──────────────────────────────────
+  Sus medicamentos quedan guardados. La próxima vez que lo abra
+  e inicie sesión, verá todo igual. Pero deberá volver a activar
+  los recordatorios eligiendo la opción 3.
+
+  ¿Puede usarlo más de una persona?
+  ───────────────────────────────────
+  Sí. Cada persona crea su propia cuenta. Los medicamentos de cada
+  uno están completamente separados. Para cambiar de usuario use
+  la opción 5 (cerrar sesión).
+
+  ¿Qué pasa si escribo mal la hora?
+  ────────────────────────────────────
+  El programa lo detecta y le pide que la escriba de nuevo.
+  Solo acepta el formato de 24 horas con dos puntos.
+  Correcto: 08:00 / 14:30 / 21:00
+  Incorrecto: 8am / 2:30pm / 8
+
+  ¿Mis datos están seguros?
+  ──────────────────────────
+  Los datos se guardan únicamente en su computadora, en archivos
+  de texto dentro de la carpeta del programa. No se envían a
+  internet ni a ningún servidor externo.
+
+  ¿Funciona sin internet?
+  ────────────────────────
+  Sí. El programa funciona completamente sin conexión a internet.
+
+  El recordatorio no apareció a tiempo. ¿Por qué?
+  ─────────────────────────────────────────────────
+  El programa revisa los horarios cada 30 segundos, no segundo
+  a segundo. Puede haber una diferencia de hasta 30 segundos.
+  Verifique también que haya activado los recordatorios (opción 3)
+  y que el programa esté abierto.
+
+  ¿Olvidé mi contraseña. Qué hago?
+  ──────────────────────────────────
+  Puede abrir el archivo usuarios.json con el Bloc de notas.
+  Está en la misma carpeta del programa. Ahí verá las contraseñas
+  de todas las cuentas y podrá leerla o cambiarla.
+
+  ¿Qué significa la hora en formato 24 horas?
+  ─────────────────────────────────────────────
+  El formato de 24 horas no usa AM ni PM. Va del 00:00 al 23:59.
+  Ejemplos:
+    08:00 = 8 de la mañana
+    12:00 = mediodía
+    14:30 = 2:30 de la tarde
+    20:00 = 8 de la noche
+    23:59 = un minuto antes de medianoche
+
+
+  RESUMEN RÁPIDO — LO MÁS IMPORTANTE
+
+    1.  Abrir el programa y crear su cuenta (solo la primera vez)
+
+    2.  La próxima vez: iniciar sesión con usuario y contraseña
+
+    3.  Opción 1 → registrar sus medicamentos
+
+    4.  Opción 3 → activar los recordatorios automáticos
+
+    5.  Dejar el programa abierto → los avisos llegan solos
+
+    6.  Opción 6 → cerrar el programa cuando no lo necesite
+
+  ⚠️  Recuerde: cada vez que abra el programa debe volver a
+      activar los recordatorios con la opción 3.
+
+══════════════════════════════════════════════════════════════════════════════

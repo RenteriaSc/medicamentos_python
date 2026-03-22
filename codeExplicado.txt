@@ -1,0 +1,1018 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║        💊  RECORDATORIO DE MEDICAMENTOS  v2.0                               ║
+║        Explicación completa del código línea por línea                      ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  Este documento explica cada línea del archivo
+  recordatorio_medicamentos.py como si fuera para alguien
+  que está aprendiendo a programar en Python.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 1 — IMPORTACIONES
+  Las herramientas que el programa necesita para funcionar
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  import json
+  ──────────────────────────────────────────────────────────────────────────────
+  Le dice a Python: "quiero usar herramientas para leer y escribir
+  archivos .json". Sin esta línea no podríamos guardar ni cargar datos.
+  Un archivo JSON es como una libreta estructurada donde guardamos
+  información en forma de texto organizado.
+
+  import os
+  ──────────────────────────────────────────────────────────────────────────────
+  Importa herramientas del sistema operativo. Se usa para dos cosas:
+    1. Limpiar la pantalla de la terminal.
+    2. Verificar si un archivo existe en el disco duro.
+  "os" viene de "Operating System" (sistema operativo).
+
+  import sys
+  ──────────────────────────────────────────────────────────────────────────────
+  Herramientas del propio Python. Se usa para:
+    1. Verificar qué versión de Python está corriendo.
+    2. Cerrar el programa de forma controlada con sys.exit().
+  "sys" viene de "system" (sistema).
+
+  import time
+  ──────────────────────────────────────────────────────────────────────────────
+  Herramientas para manejar el tiempo. Se usa principalmente para
+  time.sleep(1), que hace que el programa "duerma" (pause) por
+  la cantidad de segundos indicada. Ejemplo: time.sleep(1.2)
+  pausa el programa 1.2 segundos.
+
+  import threading
+  ──────────────────────────────────────────────────────────────────────────────
+  Esta es la más avanzada. Permite que el programa ejecute dos tareas
+  al mismo tiempo (en paralelo). Sin threading, el menú se bloquearía
+  mientras espera que llegue la hora de un recordatorio.
+  Con threading, el menú funciona normalmente Y los recordatorios
+  se revisan en segundo plano al mismo tiempo.
+
+  import importlib.util
+  ──────────────────────────────────────────────────────────────────────────────
+  Herramienta para verificar si una librería está instalada,
+  sin necesidad de importarla todavía. Esto es útil para librerías
+  opcionales: si no están instaladas, el programa sigue funcionando.
+
+  from datetime import datetime, timedelta
+  ──────────────────────────────────────────────────────────────────────────────
+  De la librería "datetime" importa DOS cosas específicas:
+
+    datetime → para obtener la hora actual, y para convertir texto
+               a objetos de hora y viceversa.
+               Ejemplo: datetime.now() devuelve la hora exacta ahora.
+
+    timedelta → representa una "duración" que se puede sumar a una hora.
+                Ejemplo: si tienes las 08:00 y sumas timedelta(hours=8),
+                obtienes las 16:00.
+
+  La diferencia con "import datetime" (sin el from) es que así podemos
+  escribir directamente "datetime.now()" en lugar de "datetime.datetime.now()".
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 2 — VARIABLES GLOBALES
+  Los "cajones" de información que usa todo el programa
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ARCHIVO_USUARIOS = "usuarios.json"
+  ──────────────────────────────────────────────────────────────────────────────
+  Una constante (por eso está en MAYÚSCULAS, es una convención de Python).
+  Guarda el nombre del archivo donde se almacenan todas las cuentas.
+  Usarlo como variable y no escribir el texto directo en el código
+  es buena práctica: si queremos cambiar el nombre del archivo,
+  solo lo cambiamos aquí y se actualiza en todo el programa.
+
+  ARCHIVO_DATOS = "medicamentos.json"
+  ──────────────────────────────────────────────────────────────────────────────
+  Nombre del archivo de medicamentos. A diferencia del anterior,
+  ESTE SÍ CAMBIA mientras el programa corre: cuando alguien inicia
+  sesión, se actualiza para apuntar al archivo personal del usuario.
+  Por ejemplo: para "sebas" se convierte en "medicamentos_sebas.json".
+
+  INTERVALO_REVISION = 30
+  ──────────────────────────────────────────────────────────────────────────────
+  Número entero. Define cuántos segundos espera el programa entre
+  cada revisión de horarios. Con 30, revisa cada 30 segundos si
+  la hora actual coincide con algún medicamento.
+  Si cambias este número a 60, revisaría cada minuto.
+
+  MEDICAMENTOS = []
+  ──────────────────────────────────────────────────────────────────────────────
+  Una lista vacía. Aquí se guardarán los medicamentos del usuario
+  que haya iniciado sesión. Empieza vacía porque al arrancar el
+  programa nadie ha hecho login todavía.
+  Los corchetes [] en Python representan una lista.
+
+  USUARIO_ACTIVO = ""
+  ──────────────────────────────────────────────────────────────────────────────
+  Texto vacío (string vacío). Cuando alguien inicia sesión
+  correctamente, aquí se guarda su nombre para mostrarlo en
+  el menú. Las comillas "" sin nada adentro = vacío.
+
+  hilo_recordatorio = None
+  ──────────────────────────────────────────────────────────────────────────────
+  Aquí se guardará el "hilo" (proceso en segundo plano) que
+  revisa los recordatorios. Empieza en None porque todavía
+  no se ha creado. None en Python significa "no existe" o "vacío".
+
+  recordatorio_activo = False
+  ──────────────────────────────────────────────────────────────────────────────
+  Un interruptor booleano (solo puede ser True o False).
+  False = recordatorios apagados (estado inicial).
+  True  = recordatorios encendidos (activo después de elegir opción 3).
+  El hilo de fondo revisa esta variable constantemente: si se pone
+  en False, el hilo se detiene solo.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 3 — UTILIDADES DE PANTALLA
+  Funciones para mostrar cosas en la terminal de forma prolija
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  def limpiar_pantalla():
+  ──────────────────────────────────────────────────────────────────────────────
+  Define una función llamada "limpiar_pantalla".
+  "def" es la palabra clave para definir funciones en Python.
+  No recibe parámetros (los paréntesis están vacíos).
+
+      os.system("cls" if os.name == "nt" else "clear")
+      ────────────────────────────────────────────────────────────────────────
+      Detecta el sistema operativo y ejecuta el comando correcto.
+
+      os.name == "nt"  →  pregunta: ¿estoy en Windows?
+                          ("nt" es el nombre interno de Windows en Python)
+
+      Si la respuesta es SÍ → ejecuta "cls"   (comando de Windows)
+      Si la respuesta es NO → ejecuta "clear" (comando de Mac/Linux)
+
+      Esto se llama OPERADOR TERNARIO: es un if-else en una sola línea.
+      La sintaxis es:  valor_si_verdadero  if  condicion  else  valor_si_falso
+
+
+  def separador(caracter="─", ancho=52):
+  ──────────────────────────────────────────────────────────────────────────────
+  Función con dos parámetros que tienen VALORES POR DEFECTO.
+  Si se llama como separador() sin argumentos, usa "─" y 52.
+  Si se llama como separador("═") usa "═" y 52.
+  Si se llama como separador("★", 50) usa "★" y 50.
+  Esto se llama PARÁMETROS OPCIONALES.
+
+      print(caracter * ancho)
+      ────────────────────────────────────────────────────────────────────────
+      En Python, multiplicar un string por un número lo repite.
+      "─" * 52  produce:  ────────────────────────────────────────────────────
+      "═" * 52  produce:  ════════════════════════════════════════════════════
+      "★" * 10  produce:  ★★★★★★★★★★
+
+
+  def pausar():
+  ──────────────────────────────────────────────────────────────────────────────
+  Detiene el programa y espera que el usuario presione ENTER.
+
+      input("\n  Presione ENTER para continuar...")
+      ────────────────────────────────────────────────────────────────────────
+      input() muestra el texto y espera que el usuario escriba algo.
+      Como no guardamos lo que escribe (no hay variable = input()),
+      solo sirve para pausar.
+      El \n al inicio es un salto de línea (nueva línea).
+
+
+  def encabezado(titulo: str):
+  ──────────────────────────────────────────────────────────────────────────────
+  Recibe un parámetro "titulo" de tipo str (texto).
+  El ": str" es un TYPE HINT: le indica al programador qué tipo
+  de dato se espera. No es obligatorio pero documenta el código.
+
+      limpiar_pantalla()
+      ────────────────────────────────────────────────────────────────────────
+      Llama a la función que definimos antes para limpiar la terminal.
+
+      separador("═")
+      ────────────────────────────────────────────────────────────────────────
+      Imprime una línea de ═══════════════════════
+
+      print(f"  💊  {titulo.upper()}")
+      ────────────────────────────────────────────────────────────────────────
+      f"..." es un F-STRING: permite meter variables dentro del texto.
+      {titulo.upper()} llama al método .upper() que convierte el texto
+      a MAYÚSCULAS. Si titulo es "registrar", imprime "REGISTRAR".
+
+      separador("═")
+      print()
+      ────────────────────────────────────────────────────────────────────────
+      Otra línea de ═══ y luego una línea vacía de espacio.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 4 — GESTIÓN DE USUARIOS
+  Funciones para leer y guardar cuentas en usuarios.json
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  def cargar_usuarios() -> dict:
+  ──────────────────────────────────────────────────────────────────────────────
+  El "-> dict" indica que esta función DEVUELVE un diccionario.
+  Un diccionario en Python es como una tabla de dos columnas:
+  clave → valor. Ejemplo: {"sebas": {"contrasena": "1234"}}.
+
+      if os.path.exists(ARCHIVO_USUARIOS):
+      ────────────────────────────────────────────────────────────────────────
+      Pregunta: ¿existe el archivo usuarios.json en el disco?
+      os.path.exists() devuelve True si el archivo existe, False si no.
+
+          try:
+          ──────────────────────────────────────────────────────────────────
+          Inicia un bloque "intenta hacer esto". Si algo falla dentro,
+          salta al bloque except en lugar de explotar el programa.
+
+              with open(ARCHIVO_USUARIOS, "r", encoding="utf-8") as f:
+              ────────────────────────────────────────────────────────────
+              Abre el archivo para LEER ("r" = read = leer).
+              encoding="utf-8" asegura que lea correctamente tildes y ñ.
+              "with" garantiza que el archivo se cierre aunque haya errores.
+              "as f" le da el nombre "f" al archivo abierto.
+
+                  return json.load(f)
+                  ────────────────────────────────────────────────────────
+                  json.load(f) lee el archivo JSON y lo convierte
+                  automáticamente en un diccionario de Python.
+                  return devuelve ese diccionario a quien llamó la función.
+
+          except (json.JSONDecodeError, IOError):
+          ──────────────────────────────────────────────────────────────
+          Si algo salió mal (archivo dañado o problema de lectura),
+          captura el error sin explotar el programa.
+          JSONDecodeError = el archivo no tiene formato JSON válido.
+          IOError = problema al leer el archivo.
+
+              return {}
+              ────────────────────────────────────────────────────────────
+              Devuelve un diccionario vacío {} como si no hubiera usuarios.
+
+      return {}
+      ────────────────────────────────────────────────────────────────────────
+      Si el archivo no existía (el if fue False), también devuelve
+      diccionario vacío. Primera vez que se ejecuta el programa.
+
+
+  def guardar_usuarios(usuarios: dict):
+  ──────────────────────────────────────────────────────────────────────────────
+  Recibe el diccionario completo de usuarios y lo escribe en el archivo.
+
+      try:
+          with open(ARCHIVO_USUARIOS, "w", encoding="utf-8") as f:
+          ────────────────────────────────────────────────────────────────────
+          Abre el archivo para ESCRIBIR ("w" = write = escribir).
+          IMPORTANTE: "w" sobreescribe todo el archivo desde cero.
+          Si el archivo no existe, lo crea automáticamente.
+
+              json.dump(usuarios, f, ensure_ascii=False, indent=4)
+              ────────────────────────────────────────────────────────────────
+              json.dump convierte el diccionario Python a texto JSON
+              y lo escribe en el archivo.
+              ensure_ascii=False → permite guardar tildes y ñ correctamente.
+              indent=4 → formatea el JSON con sangría de 4 espacios,
+                         haciéndolo legible para humanos.
+
+      except IOError as error:
+          print(f"\n  ⚠️  No se pudo guardar usuarios: {error}")
+      ────────────────────────────────────────────────────────────────────────
+      Si hay problema al escribir (disco lleno, permisos), muestra
+      el error pero no explota el programa.
+
+
+  def usuario_existe(nombre: str) -> bool:
+  ──────────────────────────────────────────────────────────────────────────────
+  Verifica si ya hay un usuario con ese nombre.
+  -> bool indica que devuelve True o False.
+
+      usuarios = cargar_usuarios()
+      ────────────────────────────────────────────────────────────────────────
+      Llama a la función anterior para obtener todos los usuarios.
+
+      return nombre.lower() in [u.lower() for u in usuarios.keys()]
+      ────────────────────────────────────────────────────────────────────────
+      Esta línea hace varias cosas al mismo tiempo:
+
+      usuarios.keys()
+        → obtiene solo los nombres de usuario (las claves del diccionario).
+          Ejemplo: ["sebas", "carlos", "maria"]
+
+      [u.lower() for u in usuarios.keys()]
+        → COMPRENSIÓN DE LISTA: convierte todos los nombres a minúsculas.
+          Ejemplo: ["sebas", "carlos", "maria"]
+          Así comparamos sin importar si escriben "Sebas" o "SEBAS".
+
+      nombre.lower() in [...]
+        → pregunta: ¿el nombre (en minúsculas) está en esa lista?
+          Devuelve True si existe, False si no.
+
+      return devuelve ese True o False directamente.
+
+
+  def validar_contrasena(contrasena: str) -> tuple:
+  ──────────────────────────────────────────────────────────────────────────────
+  -> tuple indica que devuelve una TUPLA (par de valores).
+  Una tupla es como una lista pero no se puede modificar.
+  Aquí devuelve siempre dos valores: (True/False, "mensaje").
+
+      if not contrasena:
+      ────────────────────────────────────────────────────────────────────────
+      "not contrasena" es True cuando la contraseña está vacía ("").
+      Un string vacío en Python se considera "falso" en condiciones.
+
+          return False, "La contraseña no puede estar vacía."
+          ────────────────────────────────────────────────────────────────────
+          Devuelve dos valores separados por coma: False y el mensaje.
+          Quien llame a esta función recibirá ambos valores.
+
+      if len(contrasena) < 4:
+      ────────────────────────────────────────────────────────────────────────
+      len() cuenta cuántos caracteres tiene el texto.
+      "abc" tiene 3, "abcd" tiene 4.
+      Si tiene menos de 4, devuelve False con el mensaje de error.
+
+      return True, ""
+      ────────────────────────────────────────────────────────────────────────
+      Si pasó todas las validaciones, devuelve True y mensaje vacío.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FUNCIÓN: registrar_usuario()
+  Crea una cuenta nueva paso a paso
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  def registrar_usuario() -> bool:
+  ──────────────────────────────────────────────────────────────────────────────
+  Devuelve True si el registro fue exitoso, False si canceló.
+
+      encabezado("Crear Cuenta Nueva")
+      ────────────────────────────────────────────────────────────────────────
+      Llama a la función encabezado() que limpia la pantalla y muestra
+      el título "CREAR CUENTA NUEVA" con bordes decorativos.
+
+      print("  Complete los datos para registrarse.\n")
+      ────────────────────────────────────────────────────────────────────────
+      \n al final agrega una línea en blanco después del mensaje.
+
+  ── Bucle del nombre de usuario ──
+
+      while True:
+      ────────────────────────────────────────────────────────────────────────
+      Bucle infinito. Se repite para siempre hasta que algo lo rompa
+      con "break" o "return". Se usa cuando no sabemos cuántos intentos
+      necesitará el usuario para ingresar datos válidos.
+
+          usuario = input("  👤  Nombre de usuario : ").strip()
+          ────────────────────────────────────────────────────────────────────
+          input() muestra el texto y espera que el usuario escriba.
+          .strip() elimina espacios al inicio y al final del texto.
+          Lo que el usuario escribió se guarda en la variable "usuario".
+
+          if usuario.lower() == "cancelar":
+              return False
+          ────────────────────────────────────────────────────────────────────
+          Si el usuario escribió "cancelar" (en cualquier combinación
+          de mayúsculas), sale de la función devolviendo False.
+          .lower() convierte a minúsculas para comparar sin importar
+          si escribió "Cancelar", "CANCELAR" o "cancelar".
+
+          if not usuario:
+              print("  ⚠️  El nombre no puede estar vacío.\n")
+              continue
+          ────────────────────────────────────────────────────────────────────
+          Si el usuario presionó ENTER sin escribir nada, muestra error.
+          "continue" salta al inicio del bucle while sin ejecutar
+          lo que viene después, pidiendo de nuevo el dato.
+
+          if usuario_existe(usuario):
+              print(f"  ⚠️  El usuario '{usuario}' ya existe.")
+              continue
+          ────────────────────────────────────────────────────────────────────
+          Llama a la función usuario_existe() que definimos antes.
+          Si ya existe ese nombre, muestra error y vuelve al inicio.
+
+          break
+          ────────────────────────────────────────────────────────────────────
+          Si llegó hasta aquí es porque el nombre es válido y único.
+          "break" rompe el bucle while y continúa el código de abajo.
+
+  ── Nombre completo ──
+
+      nombre_completo = input("  🔤  Su nombre (ej: Carlos López)  : ").strip()
+      ────────────────────────────────────────────────────────────────────────
+      Se pide el nombre completo (para el saludo personalizado).
+
+      if not nombre_completo:
+          nombre_completo = usuario
+      ────────────────────────────────────────────────────────────────────────
+      Si lo dejó vacío, usa el nombre de usuario como nombre completo.
+      Esto evita que el campo quede en blanco.
+
+  ── Bucle de contraseña ──
+
+      while True:
+          contrasena = input("  🔒  Contraseña (mín. 4 caracteres) : ").strip()
+
+          valida, motivo = validar_contrasena(contrasena)
+          ──────────────────────────────────────────────────────────────────
+          Llama a validar_contrasena() que devuelve dos valores.
+          Python permite recibir múltiples valores así:
+          valida = True o False
+          motivo = el mensaje de error (o "" si es válida)
+          Esto se llama DESEMPAQUETADO DE TUPLA.
+
+          if not valida:
+              print(f"  ⚠️  {motivo}\n")
+              continue
+          ──────────────────────────────────────────────────────────────────
+          Si no es válida, muestra el motivo y vuelve al inicio del bucle.
+
+          confirmar = input("  🔒  Confirme su contraseña          : ").strip()
+          if contrasena != confirmar:
+              print("  ⚠️  Las contraseñas no coinciden.")
+              continue
+          ──────────────────────────────────────────────────────────────────
+          Pide que la escriba de nuevo para confirmar.
+          != significa "diferente de".
+          Si no coinciden, vuelve a pedir la contraseña desde el inicio.
+
+          break
+          ──────────────────────────────────────────────────────────────────
+          Si llegó aquí, la contraseña es válida y fue confirmada.
+
+  ── Guardar la cuenta ──
+
+      usuarios = cargar_usuarios()
+      ────────────────────────────────────────────────────────────────────────
+      Carga todos los usuarios existentes (para no sobreescribirlos).
+
+      archivo_personal = f"medicamentos_{usuario.lower()}.json"
+      ────────────────────────────────────────────────────────────────────────
+      Crea el nombre del archivo personal de este usuario.
+      Si el usuario es "Sebas", el archivo se llama
+      "medicamentos_sebas.json". .lower() lo pone en minúsculas.
+
+      usuarios[usuario] = {
+          "contrasena"     : contrasena,
+          "nombre_completo": nombre_completo,
+          "archivo_datos"  : archivo_personal,
+          "fecha_registro" : datetime.now().strftime("%d/%m/%Y %H:%M")
+      }
+      ────────────────────────────────────────────────────────────────────────
+      Agrega una entrada nueva al diccionario de usuarios.
+      La clave es el nombre de usuario, el valor es otro diccionario
+      con todos sus datos.
+
+      datetime.now() → obtiene la fecha y hora actual.
+      .strftime("%d/%m/%Y %H:%M") → la convierte a texto con el formato
+      día/mes/año hora:minutos. Ejemplo: "15/03/2026 10:42".
+
+      guardar_usuarios(usuarios)
+      ────────────────────────────────────────────────────────────────────────
+      Llama a la función de guardar con el diccionario actualizado.
+      Esto escribe todo en usuarios.json.
+
+      return True
+      ────────────────────────────────────────────────────────────────────────
+      Registro exitoso. Devuelve True al código que llamó esta función.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FUNCIÓN: iniciar_sesion()
+  Verifica usuario y contraseña contra usuarios.json
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  def iniciar_sesion() -> bool:
+      global USUARIO_ACTIVO, ARCHIVO_DATOS
+      ────────────────────────────────────────────────────────────────────────
+      "global" le dice a Python que estas variables NO son locales
+      de la función. Cuando les asignemos un valor aquí, cambiará
+      la variable global (la que definimos al principio del archivo).
+      Sin esta línea, Python crearía copias locales que desaparecen
+      al terminar la función.
+
+      usuarios = cargar_usuarios()
+      ────────────────────────────────────────────────────────────────────────
+      Lee todos los usuarios del archivo.
+
+      usuario_key = None
+      for key in usuarios:
+          if key.lower() == usuario.lower():
+              usuario_key = key
+              break
+      ────────────────────────────────────────────────────────────────────────
+      Busca el usuario en el diccionario SIN importar mayúsculas.
+      Recorre cada clave (nombre de usuario) del diccionario.
+      Si encuentra uno que coincida (ambos en minúsculas), guarda
+      la clave original en usuario_key y rompe el bucle.
+
+      if usuario_key is None:
+          print("\n  ❌  Usuario no encontrado.")
+          pausar()
+          return False
+      ────────────────────────────────────────────────────────────────────────
+      Si después del bucle usuario_key sigue siendo None,
+      significa que no encontró el usuario. Devuelve False.
+
+      if usuarios[usuario_key]["contrasena"] != contrasena:
+      ────────────────────────────────────────────────────────────────────────
+      Accede al diccionario: usuarios["sebas"]["contrasena"]
+      Compara con lo que escribió el usuario.
+      Si son diferentes, la contraseña es incorrecta.
+
+      USUARIO_ACTIVO = usuarios[usuario_key]["nombre_completo"]
+      ARCHIVO_DATOS  = usuarios[usuario_key]["archivo_datos"]
+      ────────────────────────────────────────────────────────────────────────
+      Login exitoso. Actualiza las variables globales:
+      USUARIO_ACTIVO → nombre para mostrar en el menú.
+      ARCHIVO_DATOS  → archivo JSON personal de este usuario.
+      Desde este momento, todo el programa sabe quién está conectado.
+
+      time.sleep(1.2)
+      ────────────────────────────────────────────────────────────────────────
+      Pausa de 1.2 segundos para que el usuario pueda leer
+      el mensaje "¡Bienvenido!" antes de que aparezca el menú.
+
+      return True
+      ────────────────────────────────────────────────────────────────────────
+      Login exitoso. Devuelve True.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FUNCIÓN: pantalla_acceso()
+  Pantalla inicial con las opciones S / N / 0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  def pantalla_acceso() -> bool:
+
+      while True:
+      ────────────────────────────────────────────────────────────────────────
+      Bucle que vuelve a mostrar la pantalla si el login falla.
+      Así el usuario puede intentar de nuevo sin reiniciar el programa.
+
+          opcion = input("\n  ¿Ya tiene una cuenta? (S / N / 0) : ").strip().upper()
+          ──────────────────────────────────────────────────────────────────
+          .strip() elimina espacios.
+          .upper() convierte a mayúsculas, así "s" y "S" funcionan igual.
+
+          if opcion == "S":
+              if iniciar_sesion():
+                  return True
+          ──────────────────────────────────────────────────────────────────
+          Llama a iniciar_sesion(). Si devuelve True (login exitoso),
+          esta función también devuelve True y termina.
+          Si devuelve False (credenciales malas), no hay return, así que
+          el bucle while repite y muestra la pantalla de nuevo.
+
+          elif opcion == "N":
+              if registrar_usuario():
+                  print("\n  Ahora inicie sesión con su nueva cuenta.")
+                  pausar()
+          ──────────────────────────────────────────────────────────────────
+          Llama a registrar_usuario(). Si tiene éxito, pide que haga
+          login. El bucle while vuelve a mostrar las opciones (S/N/0)
+          para que pueda iniciar sesión con la cuenta recién creada.
+
+          elif opcion == "0":
+              return False
+          ──────────────────────────────────────────────────────────────────
+          El usuario quiere salir. Devuelve False al main().
+
+          else:
+              print("\n  ⚠️  Opción no válida.")
+              time.sleep(1.5)
+          ──────────────────────────────────────────────────────────────────
+          Si escribió algo distinto a S, N o 0, muestra error,
+          espera 1.5 segundos y vuelve al inicio del bucle.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 5 — GESTIÓN DE MEDICAMENTOS
+  Funciones para el archivo personal de cada usuario
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  def guardar_medicamentos():
+  ──────────────────────────────────────────────────────────────────────────────
+  Guarda la lista MEDICAMENTOS en el archivo personal del usuario.
+  Usa ARCHIVO_DATOS (que ya fue actualizado al hacer login).
+
+  def cargar_medicamentos():
+  ──────────────────────────────────────────────────────────────────────────────
+      global MEDICAMENTOS
+      ────────────────────────────────────────────────────────────────────────
+      Declara que va a modificar la variable global, no una copia local.
+
+      if os.path.exists(ARCHIVO_DATOS):
+      ────────────────────────────────────────────────────────────────────────
+      Verifica si el archivo personal existe. La primera vez que
+      el usuario usa el programa, este archivo no existe todavía,
+      así que empieza con lista vacía (línea del else).
+
+      MEDICAMENTOS = json.load(f)
+      ────────────────────────────────────────────────────────────────────────
+      Lee el JSON y lo convierte en una lista de diccionarios Python.
+      Cada elemento de la lista es un diccionario con los datos
+      de un medicamento.
+
+
+  def validar_hora(hora_texto: str) -> bool:
+  ──────────────────────────────────────────────────────────────────────────────
+      try:
+          datetime.strptime(hora_texto.strip(), "%H:%M")
+          return True
+      except ValueError:
+          return False
+      ────────────────────────────────────────────────────────────────────────
+      datetime.strptime() intenta CONVERTIR el texto a un objeto de hora
+      usando el formato "%H:%M" (horas:minutos en 24h).
+      Si el texto es "08:00" → funciona → devuelve True.
+      Si el texto es "25:00" o "hola" → lanza ValueError → devuelve False.
+      El try/except captura ese error sin explotar el programa.
+
+
+  def validar_frecuencia(frecuencia_texto: str) -> bool:
+  ──────────────────────────────────────────────────────────────────────────────
+      return 1 <= int(frecuencia_texto.strip()) <= 24
+      ────────────────────────────────────────────────────────────────────────
+      int() convierte el texto a número entero.
+      1 <= valor <= 24 es una COMPARACIÓN ENCADENADA de Python.
+      Equivale a: valor >= 1 AND valor <= 24.
+      Devuelve True si está en el rango, False si no.
+
+
+  def nombre_med_existe(nombre: str) -> bool:
+  ──────────────────────────────────────────────────────────────────────────────
+      return any(m["nombre"].lower() == nombre.lower() for m in MEDICAMENTOS)
+      ────────────────────────────────────────────────────────────────────────
+      any() devuelve True si AL MENOS UNO de los elementos cumple
+      la condición. Es como preguntar: "¿alguno de estos es True?".
+
+      "for m in MEDICAMENTOS" recorre cada medicamento de la lista.
+      m["nombre"] accede al campo "nombre" de ese medicamento.
+      Ambos se convierten a minúsculas con .lower() para comparar
+      sin importar mayúsculas.
+
+      Esto es un GENERADOR: crea la secuencia bajo demanda y para
+      en cuanto encuentra el primero True (más eficiente que una lista).
+
+
+  def calcular_horarios(hora_inicio: str, frecuencia: int) -> list:
+  ──────────────────────────────────────────────────────────────────────────────
+  Genera todos los horarios del día automáticamente.
+  Ejemplo: inicio="08:00", frecuencia=8 → ["08:00", "16:00", "00:00"]
+
+      horarios    = []          → lista vacía que iremos llenando
+      hora_actual = datetime.strptime(hora_inicio, "%H:%M")
+      ────────────────────────────────────────────────────────────────────────
+      Convierte el texto "08:00" a un objeto de hora para poder
+      sumarle horas con timedelta.
+
+      vistos = set()
+      ────────────────────────────────────────────────────────────────────────
+      Un SET (conjunto) en Python es como una lista pero sin duplicados
+      y con búsqueda instantánea. Lo usamos para detectar cuándo
+      dimos la vuelta completa (volvimos a la hora inicial).
+
+      while True:
+          hora_str = hora_actual.strftime("%H:%M")
+          ──────────────────────────────────────────────────────────────────
+          .strftime() convierte el objeto de hora de vuelta a texto.
+          Ejemplo: el objeto que representa las 16:00 → "16:00".
+
+          if hora_str in vistos or len(horarios) >= 24:
+              break
+          ──────────────────────────────────────────────────────────────────
+          Si ya vimos esta hora (dimos la vuelta completa) O si ya
+          tenemos 24 horarios (límite de seguridad), rompe el bucle.
+
+          vistos.add(hora_str)
+          horarios.append(hora_str)
+          hora_actual += timedelta(hours=frecuencia)
+          ──────────────────────────────────────────────────────────────────
+          Agrega la hora actual a las dos colecciones.
+          Luego suma la frecuencia de horas al objeto de hora.
+          += con timedelta es como hacer: hora_actual = hora_actual + timedelta(hours=8)
+
+      return horarios
+      ────────────────────────────────────────────────────────────────────────
+      Devuelve la lista completa de horarios calculados.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FUNCIÓN: registrar_medicamento()
+  Pide datos y agrega un medicamento a la lista
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  La estructura es la misma que registrar_usuario(): bucles while
+  para cada campo, validaciones, y al final agrega el medicamento.
+
+      MEDICAMENTOS.append({...})
+      ────────────────────────────────────────────────────────────────────────
+      .append() agrega un elemento al final de la lista.
+      El elemento es un diccionario con todos los datos del medicamento.
+
+      guardar_medicamentos()
+      ────────────────────────────────────────────────────────────────────────
+      Después de agregar a la lista en memoria, guarda en el archivo JSON
+      para que persista aunque se cierre el programa.
+
+
+  def mostrar_medicamentos():
+  ──────────────────────────────────────────────────────────────────────────────
+      for i, med in enumerate(MEDICAMENTOS, start=1):
+      ────────────────────────────────────────────────────────────────────────
+      enumerate() recorre la lista y entrega dos valores por vuelta:
+        i   → el número del elemento (empieza en 1 por "start=1").
+        med → el medicamento (diccionario).
+      Sin enumerate tendríamos que hacer: for i in range(len(MEDICAMENTOS))
+
+      estado = "✅ Activo" if med.get("activo", True) else "⏸️  Inactivo"
+      ────────────────────────────────────────────────────────────────────────
+      .get("activo", True) lee el campo "activo" del diccionario.
+      Si el campo no existe, usa True por defecto (protección defensiva).
+      Operador ternario: si activo=True → "✅ Activo", sino → "⏸️ Inactivo".
+
+
+  def eliminar_medicamento():
+  ──────────────────────────────────────────────────────────────────────────────
+      seleccion = int(input(...).strip())
+      ────────────────────────────────────────────────────────────────────────
+      int() convierte el texto que escribió el usuario a número entero.
+      Está dentro de try/except porque si escribe "abc", int() lanza
+      ValueError y lo capturamos mostrando un mensaje de error.
+
+      MEDICAMENTOS.pop(seleccion - 1)
+      ────────────────────────────────────────────────────────────────────────
+      .pop(índice) elimina el elemento en esa posición de la lista.
+      Se resta 1 porque la lista empieza en índice 0, pero el menú
+      mostraba los números empezando en 1.
+      Si el usuario eligió [2], eliminamos el índice [1].
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 6 — SISTEMA DE RECORDATORIOS
+  La parte más avanzada: threading y detección de horarios
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  def mostrar_alerta_terminal(medicamento: dict):
+  ──────────────────────────────────────────────────────────────────────────────
+      hora_actual = datetime.now().strftime("%H:%M")
+      ────────────────────────────────────────────────────────────────────────
+      datetime.now() → objeto con la fecha y hora exacta ahora mismo.
+      .strftime("%H:%M") → convierte a texto con solo horas:minutos.
+      Ejemplo: "14:32"
+
+      Luego imprime los separadores de ★ y los datos del medicamento.
+      medicamento.get("nombre", "[Sin nombre]") → acceso seguro al diccionario
+      con valor por defecto si el campo no existiera.
+
+
+  def verificar_recordatorios():
+  ──────────────────────────────────────────────────────────────────────────────
+  El corazón del sistema de recordatorios.
+
+      hora_ahora = datetime.now().strftime("%H:%M")
+      ────────────────────────────────────────────────────────────────────────
+      Obtiene la hora actual como texto: "08:00", "14:32", etc.
+
+      for med in MEDICAMENTOS:
+      ────────────────────────────────────────────────────────────────────────
+      Recorre cada medicamento de la lista.
+
+          if not med.get("activo", True):
+              continue
+          ──────────────────────────────────────────────────────────────────
+          Si el medicamento está pausado (activo=False), lo salta.
+          "continue" va directamente a la siguiente vuelta del for.
+
+          if hora_ahora in med.get("horarios", []):
+          ──────────────────────────────────────────────────────────────────
+          Pregunta: ¿la hora actual está en la lista de horarios?
+          "in" en Python verifica si un valor está dentro de una lista.
+          Ejemplo: "08:00" in ["08:00", "16:00", "00:00"] → True
+          Si sí, llama a mostrar_alerta_terminal().
+
+
+  def bucle_recordatorios():
+  ──────────────────────────────────────────────────────────────────────────────
+  Esta función corre en el HILO DE SEGUNDO PLANO.
+  Mientras el menú principal está visible, esta función está
+  corriendo al mismo tiempo en un proceso paralelo.
+
+      global recordatorio_activo
+      ────────────────────────────────────────────────────────────────────────
+      Necesita acceder a la variable global para poder leerla y modificarla.
+
+      while recordatorio_activo:
+      ────────────────────────────────────────────────────────────────────────
+      El bucle continúa SOLO MIENTRAS el interruptor sea True.
+      Cuando alguien llame a detener_recordatorios() y ponga
+      recordatorio_activo = False, este bucle termina en la próxima
+      vuelta.
+
+          verificar_recordatorios()
+          ──────────────────────────────────────────────────────────────────
+          Revisa si toca algún medicamento AHORA MISMO.
+
+          for _ in range(INTERVALO_REVISION):
+              if not recordatorio_activo:
+                  break
+              time.sleep(1)
+          ──────────────────────────────────────────────────────────────────
+          Este es un patrón especial para hilos. En vez de time.sleep(30),
+          hacemos 30 pausas de 1 segundo. ¿Por qué?
+
+          Si hiciéramos time.sleep(30) directamente, el hilo quedaría
+          CONGELADO 30 segundos sin poder responder a nada.
+          Con sleep(1) x 30, cada segundo verifica si debe detenerse.
+          El _ en "for _" es convención: indica que el contador no se usa.
+
+
+  def iniciar_recordatorios():
+  ──────────────────────────────────────────────────────────────────────────────
+      global hilo_recordatorio, recordatorio_activo
+      ────────────────────────────────────────────────────────────────────────
+      Necesita modificar ambas variables globales.
+
+      if recordatorio_activo and hilo_recordatorio and hilo_recordatorio.is_alive():
+      ────────────────────────────────────────────────────────────────────────
+      Condición triple con evaluación en CORTO CIRCUITO:
+      Python evalúa de izquierda a derecha y para en cuanto
+      uno sea False (no necesita evaluar los demás).
+
+      1. recordatorio_activo   → ¿está encendido el interruptor?
+      2. hilo_recordatorio     → ¿existe el objeto de hilo (no es None)?
+      3. .is_alive()           → ¿sigue corriendo ese hilo?
+
+      Si los tres son True, los recordatorios ya están activos.
+
+      recordatorio_activo = True
+      hilo_recordatorio = threading.Thread(
+          target=bucle_recordatorios, daemon=True
+      )
+      hilo_recordatorio.start()
+      ────────────────────────────────────────────────────────────────────────
+      1. Enciende el interruptor.
+      2. Crea un HILO nuevo que ejecutará bucle_recordatorios().
+         target=bucle_recordatorios → función que correrá en el hilo.
+         daemon=True → si el programa principal cierra, este hilo
+                       muere automáticamente con él.
+      3. .start() arranca el hilo. Desde este momento, bucle_recordatorios()
+         corre EN PARALELO al menú principal.
+
+
+  def detener_recordatorios():
+  ──────────────────────────────────────────────────────────────────────────────
+      global recordatorio_activo
+      recordatorio_activo = False
+      ────────────────────────────────────────────────────────────────────────
+      Solo apaga el interruptor. El hilo de segundo plano lo detectará
+      en su próxima iteración del bucle y se detendrá solo.
+      No necesitamos "matar" el hilo a la fuerza.
+
+
+  def estado_recordatorios() -> str:
+  ──────────────────────────────────────────────────────────────────────────────
+      if recordatorio_activo and hilo_recordatorio and hilo_recordatorio.is_alive():
+          return "🟢 ACTIVOS"
+      return "🔴 INACTIVOS"
+      ────────────────────────────────────────────────────────────────────────
+      Devuelve el texto que se muestra en el encabezado del menú.
+      Verifica las tres condiciones para confirmar que el hilo
+      realmente está corriendo, no solo que el interruptor esté encendido.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 7 — MENÚ PRINCIPAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  def menu_principal() -> str:
+  ──────────────────────────────────────────────────────────────────────────────
+  Devuelve un string: "cerrar_sesion" o "salir".
+  Quien llame a esta función usa ese valor para decidir qué hacer.
+
+      while True:
+          limpiar_pantalla()
+          ...muestra el encabezado con datos actuales...
+          ────────────────────────────────────────────────────────────────────
+          El menú se redibuja COMPLETO en cada vuelta del bucle.
+          Esto actualiza la hora, el conteo de medicamentos y
+          el estado de los recordatorios cada vez que el usuario
+          vuelve al menú.
+
+          saludo = f"BIENVENIDO {USUARIO_ACTIVO.upper()}"
+          ────────────────────────────────────────────────────────────────────
+          Usa la variable global USUARIO_ACTIVO que se configuró
+          cuando el usuario inició sesión.
+
+          opcion = input(...).strip()
+          ────────────────────────────────────────────────────────────────────
+          Espera que el usuario escriba un número.
+
+          if opcion == "1": registrar_medicamento()
+          elif opcion == "2": mostrar_medicamentos()
+          ...
+          ────────────────────────────────────────────────────────────────────
+          Según lo que escribió, llama a la función correspondiente.
+          Cuando la función termina, el bucle while vuelve al inicio
+          y redibuja el menú.
+
+          elif opcion == "5":
+              detener_recordatorios()
+              return "cerrar_sesion"
+          ────────────────────────────────────────────────────────────────────
+          Apaga los recordatorios y devuelve "cerrar_sesion" al main().
+          Esto rompe el bucle while del menú.
+
+          elif opcion == "6":
+              salir_programa()
+              return "salir"
+          ────────────────────────────────────────────────────────────────────
+          Guarda datos, muestra despedida y devuelve "salir" al main().
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SECCIÓN 8 — MAIN()
+  El director de toda la orquesta
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  def main():
+  ──────────────────────────────────────────────────────────────────────────────
+      if sys.version_info < (3, 6):
+          sys.exit(1)
+      ────────────────────────────────────────────────────────────────────────
+      sys.version_info devuelve la versión de Python como tupla.
+      Ejemplo en Python 3.12: (3, 12, 0).
+      < (3, 6) compara tuplas: si la versión es menor a 3.6, sale.
+      sys.exit(1) cierra el programa. El 1 indica error.
+
+      while True:
+          sesion_ok = pantalla_acceso()
+          ──────────────────────────────────────────────────────────────────
+          Bucle externo que permite cerrar sesión y volver al acceso.
+
+          if not sesion_ok:
+              break
+          ──────────────────────────────────────────────────────────────────
+          Si pantalla_acceso() devolvió False (eligió opción 0 = salir),
+          rompe el bucle y el programa termina.
+
+          cargar_medicamentos()
+          ──────────────────────────────────────────────────────────────────
+          DESPUÉS del login exitoso, carga los medicamentos del usuario.
+          En este punto ARCHIVO_DATOS ya fue actualizado por iniciar_sesion()
+          para apuntar al archivo personal correcto.
+
+          resultado = menu_principal()
+          ──────────────────────────────────────────────────────────────────
+          Lanza el menú. Cuando el usuario elige 5 o 6, devuelve
+          "cerrar_sesion" o "salir".
+
+          if resultado == "salir":
+              break
+          ──────────────────────────────────────────────────────────────────
+          Si eligió Salir, termina el programa.
+          Si eligió Cerrar sesión, el while vuelve al inicio y muestra
+          pantalla_acceso() de nuevo para que otro usuario entre.
+
+
+  if __name__ == "__main__":
+      main()
+  ──────────────────────────────────────────────────────────────────────────────
+  Esta es una de las líneas más importantes de cualquier programa Python.
+
+  __name__ es una variable especial que Python asigna automáticamente.
+  Cuando ejecutas directamente el archivo:
+    python3 recordatorio_medicamentos.py
+    → __name__ vale "__main__"
+    → la condición es True → se llama a main() → el programa arranca
+
+  Cuando OTRO archivo lo importa (como api.py que hace "import recordatorio_medicamentos"):
+    → __name__ vale "recordatorio_medicamentos" (el nombre del módulo)
+    → la condición es False → main() NO se llama → solo se cargan
+      las funciones y variables sin ejecutar el menú
+
+  Sin esta línea, al hacer "import recordatorio_medicamentos" en api.py,
+  el menú se abriría solo en la terminal, lo cual no queremos.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  RESUMEN — LOS 10 CONCEPTOS MÁS IMPORTANTES DEL CÓDIGO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1.  global          → permite modificar variables fuera de la función
+  2.  try/except      → maneja errores sin explotar el programa
+  3.  while True/break→ bucle que repite hasta que algo lo rompa
+  4.  .get(k, default)→ acceso seguro a diccionarios con valor por defecto
+  5.  any(gen)        → verifica si algún elemento cumple una condición
+  6.  enumerate()     → recorre una lista con índice y valor al mismo tiempo
+  7.  threading.Thread→ ejecuta dos cosas en paralelo
+  8.  f-strings       → texto con variables: f"Hola {nombre}"
+  9.  strptime/strftime→ convierte entre texto y objetos de hora
+  10. __name__=="__main__" → protege el punto de entrada del programa
+
+══════════════════════════════════════════════════════════════════════════════
