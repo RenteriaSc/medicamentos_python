@@ -1,73 +1,332 @@
+#!/usr/bin/env python3
 # =============================================================================
-#  💊 RECORDATORIO DE MEDICAMENTOS 
+#  💊 RECORDATORIO DE MEDICAMENTOS
+#  Versión : 2.0
+#  Autor   : Proyecto Personal Python 3
 # =============================================================================
-#  Versión    : 1.0
-#  Descripción: Programa de terminal para registrar medicamentos y recibir
-#               recordatorios automáticos con notificaciones del sistema.
-#  INSTALACIÓN DE DEPENDENCIAS (ejecutar antes de usar el programa):
 
+
+# ── Importaciones de la librería estándar ─────────────────────────────────────
 import json
 import os
 import sys
 import time
 import threading
+import importlib.util
 from datetime import datetime, timedelta
 
-# ── Verificamos disponibilidad de librerías opcionales ──────────────────────────────────
-import importlib.util
 
-SCHEDULE_DISPONIBLE = importlib.util.find_spec("schedule") is not None
-NOTIFICACIONES_DISPONIBLES = importlib.util.find_spec("plyer") is not None
 
-if SCHEDULE_DISPONIBLE:
-    import schedule
 
-if NOTIFICACIONES_DISPONIBLES:
-    from plyer import notification
+# =============================================================================
+#  CONFIGURACIÓN GLOBAL
+# =============================================================================
 
-ARCHIVO_DATOS = "medicamentos.json"   
-INTERVALO_REVISION = 30               
-MEDICAMENTOS = []                     
-hilo_recordatorio = None              
-recordatorio_activo = False           
+ARCHIVO_USUARIOS   = "usuarios.json"      # guarda todas las cuentas
+ARCHIVO_DATOS      = "medicamentos.json"  # cambia según el usuario activo
+INTERVALO_REVISION = 30                   # segundos entre revisiones
+
+# Estado global del programa
+MEDICAMENTOS        = []
+USUARIO_ACTIVO      = ""   # nombre del usuario que inició sesión
+hilo_recordatorio   = None
+recordatorio_activo = False
+
+
+# =============================================================================
+#  UTILIDADES DE PANTALLA
+# =============================================================================
 
 def limpiar_pantalla():
+    """Limpia la terminal en Windows, Mac y Linux."""
     os.system("cls" if os.name == "nt" else "clear")
 
-def separador(caracter="─", ancho=50):
+
+def separador(caracter="─", ancho=52):
+    """Imprime una línea decorativa del largo indicado."""
     print(caracter * ancho)
 
+
 def pausar():
+    """Espera a que el usuario presione ENTER."""
     input("\n  Presione ENTER para continuar...")
 
+
 def encabezado(titulo: str):
+    """Muestra un título limpio con bordes."""
     limpiar_pantalla()
     separador("═")
     print(f"  💊  {titulo.upper()}")
     separador("═")
     print()
 
-def guardar_medicamentos():
+
+# =============================================================================
+#  GESTIÓN DE USUARIOS  →  usuarios.json
+# =============================================================================
+
+def cargar_usuarios() -> dict:
+    """
+    Lee usuarios.json y devuelve el diccionario de cuentas.
+    Si el archivo no existe o está dañado, devuelve un diccionario vacío.
+
+    Estructura interna del JSON:
+        {
+            "sebas": {
+                "contrasena"     : "1234",
+                "nombre_completo": "Sebastián",
+                "archivo_datos"  : "medicamentos_sebas.json",
+                "fecha_registro" : "15/03/2026 10:00"
+            }
+        }
+    """
+    if os.path.exists(ARCHIVO_USUARIOS):
+        try:
+            with open(ARCHIVO_USUARIOS, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
+    return {}
+
+
+def guardar_usuarios(usuarios: dict):
+    """Escribe el diccionario completo de usuarios en usuarios.json."""
     try:
-        with open(ARCHIVO_DATOS, "w", encoding="utf-8") as archivo:
-            json.dump(MEDICAMENTOS, archivo, ensure_ascii=False, indent=4)
+        with open(ARCHIVO_USUARIOS, "w", encoding="utf-8") as f:
+            json.dump(usuarios, f, ensure_ascii=False, indent=4)
     except IOError as error:
-        print(f"\n  ⚠️  No se pudo guardar el archivo: {error}")
+        print(f"\n  ⚠️  No se pudo guardar usuarios: {error}")
+
+
+def usuario_existe(nombre: str) -> bool:
+    """Devuelve True si ya hay una cuenta con ese nombre (sin importar mayúsculas)."""
+    usuarios = cargar_usuarios()
+    return nombre.lower() in [u.lower() for u in usuarios.keys()]
+
+
+def validar_contrasena(contrasena: str) -> tuple:
+    """
+    Verifica que la contraseña cumpla los requisitos mínimos.
+
+    Retorna:
+        (True,  "")        si es válida
+        (False, "motivo")  si no cumple los requisitos
+    """
+    if not contrasena:
+        return False, "La contraseña no puede estar vacía."
+    if len(contrasena) < 4:
+        return False, "La contraseña debe tener al menos 4 caracteres."
+    return True, ""
+
+
+# ── Crear cuenta nueva ────────────────────────────────────────────────────────
+
+def registrar_usuario() -> bool:
+    """
+    Guía al usuario paso a paso para crear una cuenta nueva.
+    Valida nombre único, contraseña con confirmación.
+
+    Retorna:
+        True  si el registro fue exitoso
+        False si el usuario canceló
+    """
+    encabezado("Crear Cuenta Nueva")
+    print("  Complete los datos para registrarse.\n")
+    print("  (Escriba 'cancelar' en cualquier campo para volver)\n")
+
+    # ── Nombre de usuario ─────────────────────────────────────────────────────
+    while True:
+        usuario = input("  👤  Nombre de usuario : ").strip()
+        if usuario.lower() == "cancelar":
+            return False
+        if not usuario:
+            print("  ⚠️  El nombre no puede estar vacío.\n")
+            continue
+        if usuario_existe(usuario):
+            print(f"  ⚠️  El usuario '{usuario}' ya existe. Elija otro.\n")
+            continue
+        break
+
+    # ── Nombre completo (para el saludo personalizado) ────────────────────────
+    nombre_completo = input("  🔤  Su nombre (ej: Carlos López)  : ").strip()
+    if nombre_completo.lower() == "cancelar":
+        return False
+    if not nombre_completo:
+        nombre_completo = usuario   # si lo deja vacío, usa el nombre de usuario
+
+    # ── Contraseña con confirmación ───────────────────────────────────────────
+    while True:
+        contrasena = input("  🔒  Contraseña (mín. 4 caracteres) : ").strip()
+        if contrasena.lower() == "cancelar":
+            return False
+
+        valida, motivo = validar_contrasena(contrasena)
+        if not valida:
+            print(f"  ⚠️  {motivo}\n")
+            continue
+
+        confirmar = input("  🔒  Confirme su contraseña          : ").strip()
+        if contrasena != confirmar:
+            print("  ⚠️  Las contraseñas no coinciden. Intente de nuevo.\n")
+            continue
+        break
+
+    # ── Guardar la cuenta ─────────────────────────────────────────────────────
+    usuarios         = cargar_usuarios()
+    archivo_personal = f"medicamentos_{usuario.lower()}.json"
+
+    usuarios[usuario] = {
+        "contrasena"     : contrasena,
+        "nombre_completo": nombre_completo,
+        "archivo_datos"  : archivo_personal,
+        "fecha_registro" : datetime.now().strftime("%d/%m/%Y %H:%M")
+    }
+    guardar_usuarios(usuarios)
+
+    print()
+    separador()
+    print("  ✅  ¡Cuenta creada exitosamente!\n")
+    print(f"      Usuario : {usuario}")
+    print(f"      Nombre  : {nombre_completo}")
+    separador()
+    pausar()
+    return True
+
+
+# ── Iniciar sesión ────────────────────────────────────────────────────────────
+
+def iniciar_sesion() -> bool:
+    """
+    Pide usuario y contraseña, los verifica contra usuarios.json.
+    Si son correctos configura USUARIO_ACTIVO y ARCHIVO_DATOS.
+
+    Retorna:
+        True  si las credenciales son válidas
+        False si son incorrectas o el usuario canceló
+    """
+    global USUARIO_ACTIVO, ARCHIVO_DATOS
+
+    encabezado("Iniciar Sesión")
+    print("  (Escriba 'cancelar' para volver)\n")
+
+    usuario = input("  👤  Usuario    : ").strip()
+    if usuario.lower() == "cancelar":
+        return False
+
+    contrasena = input("  🔒  Contraseña : ").strip()
+    if contrasena.lower() == "cancelar":
+        return False
+
+    usuarios = cargar_usuarios()
+
+    # Buscar el usuario sin distinguir mayúsculas
+    usuario_key = None
+    for key in usuarios:
+        if key.lower() == usuario.lower():
+            usuario_key = key
+            break
+
+    if usuario_key is None:
+        print("\n  ❌  Usuario no encontrado.")
+        pausar()
+        return False
+
+    if usuarios[usuario_key]["contrasena"] != contrasena:
+        print("\n  ❌  Contraseña incorrecta.")
+        pausar()
+        return False
+
+    # Credenciales válidas → activar sesión
+    USUARIO_ACTIVO = usuarios[usuario_key]["nombre_completo"]
+    ARCHIVO_DATOS  = usuarios[usuario_key]["archivo_datos"]
+
+    print(f"\n  ✅  ¡Bienvenido, {USUARIO_ACTIVO}!")
+    time.sleep(1.2)
+    return True
+
+
+# ── Pantalla de acceso (pregunta si ya tiene cuenta) ─────────────────────────
+
+def pantalla_acceso() -> bool:
+    """
+    Muestra la pantalla inicial y dirige al usuario según su elección.
+
+    Retorna:
+        True  si inició sesión correctamente
+        False si eligió salir del programa
+    """
+    while True:
+        limpiar_pantalla()
+        separador("═")
+        print("  💊  RECORDATORIO DE MEDICAMENTOS  v2.0")
+        separador("═")
+        print()
+        print("  Gestione sus medicamentos de forma sencilla.")
+        print()
+        separador("─")
+        print()
+        print("  [S]  Ya tengo una cuenta  →  Iniciar sesión")
+        print("  [N]  Soy nuevo            →  Crear cuenta")
+        print("  [0]  Salir del programa")
+        print()
+        separador("═")
+
+        opcion = input("\n  ¿Ya tiene una cuenta? (S / N / 0) : ").strip().upper()
+
+        if opcion == "S":
+            if iniciar_sesion():
+                return True
+            # Si el login falla, el bucle vuelve a mostrar esta pantalla
+
+        elif opcion == "N":
+            if registrar_usuario():
+                print("\n  Ahora inicie sesión con su nueva cuenta.")
+                pausar()
+            # Tras registrarse, vuelve al menú de acceso para hacer login
+
+        elif opcion == "0":
+            return False
+
+        else:
+            print("\n  ⚠️  Opción no válida. Escriba S, N o 0.")
+            time.sleep(1.5)
+
+
+# =============================================================================
+#  GESTIÓN DE MEDICAMENTOS  →  archivo personal de cada usuario
+# =============================================================================
+
+def guardar_medicamentos():
+    """Guarda MEDICAMENTOS en el archivo personal del usuario activo."""
+    try:
+        with open(ARCHIVO_DATOS, "w", encoding="utf-8") as f:
+            json.dump(MEDICAMENTOS, f, ensure_ascii=False, indent=4)
+    except IOError as error:
+        print(f"\n  ⚠️  No se pudo guardar: {error}")
+
 
 def cargar_medicamentos():
+    """
+    Carga los medicamentos desde el archivo personal del usuario activo.
+    Si el archivo no existe, inicia con la lista vacía.
+    """
     global MEDICAMENTOS
     if os.path.exists(ARCHIVO_DATOS):
         try:
-            with open(ARCHIVO_DATOS, "r", encoding="utf-8") as archivo:
-                MEDICAMENTOS = json.load(archivo)
-            print(f"  ✅  Se cargaron {len(MEDICAMENTOS)} medicamento(s) guardado(s).")
+            with open(ARCHIVO_DATOS, "r", encoding="utf-8") as f:
+                MEDICAMENTOS = json.load(f)
+            print(f"  ✅  {len(MEDICAMENTOS)} medicamento(s) cargado(s).")
         except (json.JSONDecodeError, IOError):
-            print("  ⚠️  El archivo de datos estaba dañado. Comenzando desde cero.")
+            print("  ⚠️  Archivo dañado. Comenzando desde cero.")
             MEDICAMENTOS = []
     else:
         MEDICAMENTOS = []
 
+
+# ── Validaciones ──────────────────────────────────────────────────────────────
+
 def validar_hora(hora_texto: str) -> bool:
+    """Devuelve True si la hora tiene formato HH:MM válido."""
     try:
         datetime.strptime(hora_texto.strip(), "%H:%M")
         return True
@@ -76,203 +335,228 @@ def validar_hora(hora_texto: str) -> bool:
 
 
 def validar_frecuencia(frecuencia_texto: str) -> bool:
+    """Devuelve True si la frecuencia es un entero entre 1 y 24."""
     try:
-        valor = int(frecuencia_texto.strip())
-        return 1 <= valor <= 24
+        return 1 <= int(frecuencia_texto.strip()) <= 24
     except ValueError:
         return False
 
 
-def nombre_ya_existe(nombre: str) -> bool:
+def nombre_med_existe(nombre: str) -> bool:
+    """Devuelve True si ya hay un medicamento con ese nombre."""
     return any(m["nombre"].lower() == nombre.lower() for m in MEDICAMENTOS)
 
-def registrar_medicamento():
-    print("  Por favor, ingrese los datos del medicamento.\n")
-    print("  (Escriba 'cancelar' en cualquier momento para volver al menú)\n")
 
+def calcular_horarios(hora_inicio: str, frecuencia: int) -> list:
+    """
+    Genera la lista de horarios del día según la frecuencia.
+
+    Ejemplo: inicio='08:00', frecuencia=8 → ['08:00', '16:00', '00:00']
+    """
+    horarios    = []
+    hora_actual = datetime.strptime(hora_inicio, "%H:%M")
+    vistos      = set()
+
+    while True:
+        hora_str = hora_actual.strftime("%H:%M")
+        if hora_str in vistos or len(horarios) >= 24:
+            break
+        vistos.add(hora_str)
+        horarios.append(hora_str)
+        hora_actual += timedelta(hours=frecuencia)
+
+    return horarios
+
+
+# ── CRUD de medicamentos ──────────────────────────────────────────────────────
+
+def registrar_medicamento():
+    """Solicita datos del medicamento y lo guarda en la lista."""
+    encabezado("Registrar Medicamento")
+    print("  (Escriba 'cancelar' en cualquier campo para volver)\n")
+
+    # Nombre del medicamento
     while True:
         nombre = input("  🔤  Nombre del medicamento : ").strip()
         if nombre.lower() == "cancelar":
             return
         if not nombre:
-            print("  ⚠️  El nombre no puede estar vacío. Intente de nuevo.\n")
+            print("  ⚠️  El nombre no puede estar vacío.\n")
             continue
-        if nombre_ya_existe(nombre):
-            print(f"  ⚠️  Ya existe '{nombre}'. Use un nombre diferente.\n")
+        if nombre_med_existe(nombre):
+            print(f"  ⚠️  '{nombre}' ya existe. Use un nombre diferente.\n")
             continue
         break
 
-    dosis = input("  💉  Dosis (ej: 500mg, dejar vacío si no aplica): ").strip()
+    # Dosis
+    dosis = input("  💉  Dosis (ej: 500mg, o ENTER para omitir) : ").strip()
     if dosis.lower() == "cancelar":
         return
     if not dosis:
         dosis = "Sin dosis especificada"
 
+    # Hora de toma
     while True:
-        hora_texto = input("  🕐  Hora de toma (formato 24h) : ").strip()
+        hora_texto = input("  🕐  Hora de toma (HH:MM, ej: 08:00)       : ").strip()
         if hora_texto.lower() == "cancelar":
             return
         if validar_hora(hora_texto):
             break
-        print("  ⚠️  Formato incorrecto. Use HH:MM (ejemplo: 08:00 o 14:30).\n")
+        print("  ⚠️  Formato incorrecto. Use HH:MM (ej: 08:00).\n")
 
+    # Frecuencia
     while True:
-        frecuencia_texto = input("  🔁  Frecuencia en horas (ej: 8 = cada 8 horas): ").strip()
-        if frecuencia_texto.lower() == "cancelar":
+        frec_texto = input("  🔁  Frecuencia en horas (1-24)             : ").strip()
+        if frec_texto.lower() == "cancelar":
             return
-        if validar_frecuencia(frecuencia_texto):
-            frecuencia = int(frecuencia_texto)
+        if validar_frecuencia(frec_texto):
+            frecuencia = int(frec_texto)
             break
         print("  ⚠️  Ingrese un número entre 1 y 24.\n")
 
     horarios = calcular_horarios(hora_texto, frecuencia)
-    nuevo_medicamento = {
+
+    MEDICAMENTOS.append({
         "nombre"     : nombre,
         "dosis"      : dosis,
         "hora_inicio": hora_texto,
         "frecuencia" : frecuencia,
-        "horarios"   : horarios,          
-        "activo"     : True               
-    }
-
-    MEDICAMENTOS.append(nuevo_medicamento)
+        "horarios"   : horarios,
+        "activo"     : True
+    })
     guardar_medicamentos()
+
     print()
     separador()
-    print(f"  ✅  ¡Medicamento registrado con éxito!\n")
-    print(f"      Medicamento : {nombre}")
-    print(f"      Dosis       : {dosis}")
-    print(f"      Horarios    : {', '.join(horarios)}")
+    print("  ✅  ¡Medicamento registrado!\n")
+    print(f"      Nombre   : {nombre}")
+    print(f"      Dosis    : {dosis}")
+    print(f"      Horarios : {', '.join(horarios)}")
     separador()
-
     pausar()
 
 
-def calcular_horarios(hora_inicio: str, frecuencia: int) -> list:
-    horarios = []
-    hora_actual = datetime.strptime(hora_inicio, "%H:%M")
-
-    while True:
-        horarios.append(hora_actual.strftime("%H:%M"))
-        hora_actual += timedelta(hours=frecuencia)
-        if hora_actual.strftime("%H:%M") == hora_inicio or len(horarios) >= 24:
-            break
-
-    return horarios
-
-
 def mostrar_medicamentos():
-    encabezado("Medicamentos Registrados")
+    """Muestra la lista completa de medicamentos del usuario activo."""
+    encabezado("Mis Medicamentos")
 
     if not MEDICAMENTOS:
-        print("  📭  No hay medicamentos registrados todavía.\n")
-        print("  Use la opción 1 del menú para agregar un medicamento.")
+        print("  📭  No hay medicamentos registrados.\n")
+        print("      Use la opción 1 para agregar el primero.")
         pausar()
         return
 
-    print(f"  Total de medicamentos: {len(MEDICAMENTOS)}\n")
+    print(f"  Total: {len(MEDICAMENTOS)} medicamento(s)\n")
 
-    for indice, med in enumerate(MEDICAMENTOS, start=1):
-        estado = "✅ Activo" if med["activo"] else "⏸️  Inactivo"
+    for i, med in enumerate(MEDICAMENTOS, start=1):
+        estado = "✅ Activo" if med.get("activo", True) else "⏸️  Inactivo"
         separador("─")
-        print(f"  [{indice}]  {med['nombre'].upper()}  —  {estado}")
+        nombre = med.get("nombre", "[Sin nombre]").upper()
+        print(f"  [{i}]  {nombre}  —  {estado}")
         separador("─")
-        print(f"       💉 Dosis       : {med['dosis']}")
-        print(f"       🕐 Hora inicio : {med['hora_inicio']}")
-        print(f"       🔁 Frecuencia  : cada {med['frecuencia']} hora(s)")
-        print(f"       📋 Horarios    : {', '.join(med['horarios'])}")
+        dosis = med.get("dosis", "[Sin información]")
+        hora_inicio = med.get("hora_inicio", "[Sin información]")
+        frecuencia = med.get("frecuencia", "[Sin información]")
+        horarios = med.get("horarios", [])
+        print(f"       💉 Dosis       : {dosis}")
+        print(f"       🕐 Hora inicio : {hora_inicio}")
+        print(f"       🔁 Frecuencia  : cada {frecuencia} hora(s)")
+        if horarios:
+            print(f"       📋 Horarios    : {', '.join(horarios)}")
+        else:
+            print(f"       📋 Horarios    : [Sin información]")
         print()
 
     pausar()
 
 
 def eliminar_medicamento():
+    """Solicita confirmación y elimina el medicamento seleccionado."""
     encabezado("Eliminar Medicamento")
 
     if not MEDICAMENTOS:
-        print("  📭  No hay medicamentos registrados para eliminar.")
+        print("  📭  No hay medicamentos para eliminar.")
         pausar()
         return
 
-    print("  Seleccione el número del medicamento que desea eliminar:\n")
     for i, med in enumerate(MEDICAMENTOS, start=1):
-        print(f"  [{i}]  {med['nombre']}  —  {med['dosis']}  —  {med['hora_inicio']}")
+        nombre = med.get("nombre", "[Sin nombre]")
+        dosis = med.get("dosis", "[Sin dosis]")
+        hora = med.get("hora_inicio", "[Sin hora]")
+        print(f"  [{i}]  {nombre}  —  {dosis}  —  {hora}")
 
-    print(f"\n  [0]  Cancelar y volver al menú")
+    print("\n  [0]  Cancelar")
     separador()
 
     while True:
         try:
             seleccion = int(input("\n  Ingrese el número: ").strip())
         except ValueError:
-            print("  ⚠️  Por favor ingrese solo números.")
+            print("  ⚠️  Solo números.")
             continue
-
         if seleccion == 0:
             return
         if 1 <= seleccion <= len(MEDICAMENTOS):
             break
-        print(f"  ⚠️  Número fuera de rango. Elija entre 1 y {len(MEDICAMENTOS)}.")
+        print(f"  ⚠️  Número fuera de rango (1-{len(MEDICAMENTOS)}).")
 
-    medicamento_elegido = MEDICAMENTOS[seleccion - 1]
+    elegido = MEDICAMENTOS[seleccion - 1]
+    nombre_med = elegido.get("nombre", "[Sin nombre]")
+    print(f"\n  ¿Seguro que desea eliminar '{nombre_med}'?")
 
-    print(f"\n  ¿Está seguro que desea eliminar '{medicamento_elegido['nombre']}'?")
-    confirmacion = input("  Escriba SI para confirmar: ").strip().upper()
-
-    if confirmacion == "SI":
-        nombre_eliminado = medicamento_elegido["nombre"]
+    if input("  Escriba SI para confirmar: ").strip().upper() == "SI":
+        nombre_elim = elegido.get("nombre", "[Sin nombre]")
         MEDICAMENTOS.pop(seleccion - 1)
         guardar_medicamentos()
-        print(f"\n  🗑️  '{nombre_eliminado}' eliminado correctamente.")
+        print(f"\n  🗑️  '{nombre_elim}' eliminado correctamente.")
     else:
-        print("\n  ❌  Eliminación cancelada. No se hicieron cambios.")
+        print("\n  ❌  Cancelado. No se hicieron cambios.")
 
     pausar()
 
-def enviar_notificacion(nombre: str, dosis: str):
-    if NOTIFICACIONES_DISPONIBLES:
-        try:
-            notification.notify(
-                title   = "💊 Recordatorio de Medicamento",
-                message = f"Es hora de tomar: {nombre}\nDosis: {dosis}",
-                app_name= "Recordatorio de Medicamentos",
-                timeout = 10   
-            )
-        except Exception:
-            pass  
 
+# =============================================================================
+#  SISTEMA DE RECORDATORIOS
+# =============================================================================
 
 def mostrar_alerta_terminal(medicamento: dict):
+    """Imprime la alerta visual con estrellas en la terminal."""
     hora_actual = datetime.now().strftime("%H:%M")
     print("\n")
-    separador("★", 50)
-    print("  ⏰  ¡RECORDATORIO DE MEDICAMENTO! ⏰")
-    separador("★", 50)
-    print(f"\n  💊  Es hora de tomar su medicamento\n")
-    print(f"      🔤 Medicamento : {medicamento['nombre']}")
-    print(f"      💉 Dosis       : {medicamento['dosis']}")
+    separador("★", 52)
+    print("  ⏰  ¡RECORDATORIO DE MEDICAMENTO!")
+    separador("★", 52)
+    print("\n  💊  Es hora de tomar su medicamento\n")
+    nombre = medicamento.get("nombre", "[Sin nombre]")
+    dosis = medicamento.get("dosis", "[Sin dosis]")
+    print(f"      🔤 Medicamento : {nombre}")
+    print(f"      💉 Dosis       : {dosis}")
     print(f"      🕐 Hora        : {hora_actual}")
-    separador("★", 50)
+    separador("★", 52)
     print()
 
 
 def verificar_recordatorios():
+    """
+    Compara la hora actual (HH:MM) con los horarios de cada
+    medicamento activo. Si coincide, dispara alerta y notificación.
+    """
     hora_ahora = datetime.now().strftime("%H:%M")
-
-    for medicamento in MEDICAMENTOS:
-        if not medicamento.get("activo", True):
-            continue  
-
-        if hora_ahora in medicamento.get("horarios", []):
-            mostrar_alerta_terminal(medicamento)
-            enviar_notificacion(medicamento["nombre"], medicamento["dosis"])
+    for med in MEDICAMENTOS:
+        if not med.get("activo", True):
+            continue
+        if hora_ahora in med.get("horarios", []):
+            mostrar_alerta_terminal(med)
 
 
 def bucle_recordatorios():
+    """
+    Corre en el hilo de segundo plano.
+    Llama a verificar_recordatorios() cada INTERVALO_REVISION segundos.
+    Usa sleep(1) en bucle para poder detenerse rápidamente.
+    """
     global recordatorio_activo
-    print(f"\n  🔔  Recordatorios iniciados. Revisando cada {INTERVALO_REVISION} segundos...")
-    print(f"      (El menú sigue disponible mientras los recordatorios están activos)\n")
-
+    print(f"\n  🔔  Recordatorios activos. Revisando cada {INTERVALO_REVISION}s...\n")
     while recordatorio_activo:
         verificar_recordatorios()
         for _ in range(INTERVALO_REVISION):
@@ -282,37 +566,30 @@ def bucle_recordatorios():
 
 
 def iniciar_recordatorios():
+    """Lanza el hilo de recordatorios si no está ya en ejecución."""
     global hilo_recordatorio, recordatorio_activo
 
     encabezado("Iniciar Recordatorios")
 
     if not MEDICAMENTOS:
-        print("  📭  No hay medicamentos registrados.")
-        print("      Use la opción 1 para agregar un medicamento primero.\n")
+        print("  📭  No hay medicamentos. Registre uno primero.")
         pausar()
         return
 
     if recordatorio_activo and hilo_recordatorio and hilo_recordatorio.is_alive():
-        print("  ✅  Los recordatorios ya están activos y funcionando.\n")
-        print(f"      Revisando cada {INTERVALO_REVISION} segundos en segundo plano.")
+        print("  ✅  Los recordatorios ya están activos.\n")
+        print(f"      Revisión cada {INTERVALO_REVISION} segundos.")
         pausar()
         return
 
-    print("  Se activarán recordatorios para los siguientes medicamentos:\n")
+    print("  Medicamentos que serán monitoreados:\n")
     for med in MEDICAMENTOS:
         if med.get("activo", True):
-            print(f"  💊  {med['nombre']}  →  Horarios: {', '.join(med['horarios'])}")
-
-    print()
-
-    if not NOTIFICACIONES_DISPONIBLES:
-        print("  ℹ️  Nota: Las notificaciones del sistema NO están disponibles.")
-        print("      Instale 'plyer' con:  pip install plyer\n")
+            print(f"  💊  {med['nombre']}  →  {', '.join(med['horarios'])}")
 
     recordatorio_activo = True
-    hilo_recordatorio = threading.Thread(
-        target=bucle_recordatorios,
-        daemon=True   
+    hilo_recordatorio   = threading.Thread(
+        target=bucle_recordatorios, daemon=True
     )
     hilo_recordatorio.start()
 
@@ -321,111 +598,155 @@ def iniciar_recordatorios():
     separador()
     pausar()
 
+
 def detener_recordatorios():
+    """Apaga el hilo de recordatorios poniendo la bandera en False."""
     global recordatorio_activo
     recordatorio_activo = False
 
-def mostrar_estado_recordatorios() -> str:
+
+def estado_recordatorios() -> str:
+    """Devuelve el indicador visual del estado actual del sistema."""
     if recordatorio_activo and hilo_recordatorio and hilo_recordatorio.is_alive():
         return "🟢 ACTIVOS"
     return "🔴 INACTIVOS"
 
 
-def menu_principal():
+# =============================================================================
+#  MENÚ PRINCIPAL  —  solo accesible tras login exitoso
+# =============================================================================
+
+def menu_principal() -> str:
+    """
+    Muestra el menú con las opciones del programa.
+
+    Retorna:
+        "cerrar_sesion"  si el usuario elige la opción 5
+        "salir"          si el usuario elige la opción 6
+    """
     while True:
         limpiar_pantalla()
         separador("═")
-        print("💊   RECORDATORIO DE MEDICAMENTOS   💊")
-        separador("=")
-        print(f"  🕐  Hora actual    : {datetime.now().strftime('%H:%M  —  %d/%m/%Y')}")
-        print(f"  📋  Medicamentos   : {len(MEDICAMENTOS)} registrado(s)")
-        print(f"  🔔  Recordatorios  : {mostrar_estado_recordatorios()}")
+        print(f"  💊  BIENVENIDO, {USUARIO_ACTIVO.upper()}")
+        separador("═")
+        print(f"  🕐  Hora          : {datetime.now().strftime('%H:%M  —  %d/%m/%Y')}")
+        print(f"  📋  Medicamentos  : {len(MEDICAMENTOS)} registrado(s)")
+        print(f"  🔔  Recordatorios : {estado_recordatorios()}")
         separador("─")
         print()
         print("     MENÚ PRINCIPAL")
         print()
         print("  [1]  📝  Registrar medicamento")
         print("  [2]  📋  Ver mis medicamentos")
-        print("  [3]  🔔  Iniciar recordatorios automáticos")
+        print("  [3]  🔔  Iniciar recordatorios")
         print("  [4]  🗑️   Eliminar medicamento")
-        print("  [5]  🚪  Salir del programa")
+        print("  [5]  🔓  Cerrar sesión")
+        print("  [6]  🚪  Salir del programa")
         print()
         separador("═")
 
-        opcion = input("\n  ¿Qué desea hacer? Ingresa el número: ").strip()
+        opcion = input("\n  ¿Qué desea hacer? Ingrese el número: ").strip()
 
-        if opcion == "1":
+        if   opcion == "1":
             registrar_medicamento()
-
         elif opcion == "2":
             mostrar_medicamentos()
-
         elif opcion == "3":
             iniciar_recordatorios()
-
         elif opcion == "4":
             eliminar_medicamento()
-
         elif opcion == "5":
+            detener_recordatorios()
+            print(f"\n  👋  Sesión cerrada. ¡Hasta luego, {USUARIO_ACTIVO}!")
+            time.sleep(1.2)
+            return "cerrar_sesion"
+        elif opcion == "6":
             salir_programa()
-            break
-
+            return "salir"
         else:
-            print("\n  ⚠️  Opción no válida. Por favor elija un número del 1 al 5.")
-            time.sleep(2)
+            print("\n  ⚠️  Opción inválida. Elija entre 1 y 6.")
+            time.sleep(1.5)
 
+
+# =============================================================================
+#  DESPEDIDA
+# =============================================================================
 
 def salir_programa():
+    """Detiene recordatorios, guarda datos y muestra el mensaje de salida."""
     detener_recordatorios()
     guardar_medicamentos()
     limpiar_pantalla()
-    separador("=")
-    print("💊  RECORDATORIO DE MEDICAMENTOS")
-    separador("=")
+    separador("═")
+    print("  💊  RECORDATORIO DE MEDICAMENTOS")
+    separador("═")
     print()
-    print("¡Hasta luego!")
+    nombre = USUARIO_ACTIVO if USUARIO_ACTIVO else "usuario"
+    print(f"  👋  ¡Hasta luego, {nombre}!")
     print()
-    print("Recuerda siempre tomar tus medicamentos a tiempo.")
-    print("¡Nos vemos pronto! 🌟")
+    print("  Recuerde siempre tomar sus medicamentos a tiempo.")
+    print("  ¡Cuídese mucho! 🌟")
     print()
-    separador("=")
+    separador("═")
     print()
+
+
+# =============================================================================
+#  PUNTO DE ENTRADA
+# =============================================================================
 
 def main():
+    """
+    Flujo completo del programa:
+
+        1. Verifica Python >= 3.6
+        2. Muestra el estado de las librerías opcionales
+        3. Bucle externo:
+               a. pantalla_acceso()  → login o registro
+               b. Si el usuario eligió salir → termina
+               c. Si el login fue exitoso → carga medicamentos → menú
+               d. Si elige 'Cerrar sesión' → vuelve al paso a
+               e. Si elige 'Salir'         → termina
+    """
+    # Verificar versión mínima
     if sys.version_info < (3, 6):
-        print("⚠️  Este programa requiere Python 3.6 o superior.")
+        print("⚠️  Se requiere Python 3.6 o superior.")
         sys.exit(1)
 
+    # Bienvenida inicial (se muestra una sola vez)
     limpiar_pantalla()
-    separador("=")
-    print("  💊   BIENVENIDO AL RECORDATORIO DE MEDICAMENTOS   💊")
-    separador("=")
-    print()
-    print("  Este programa le ayudará a recordar cuándo tomar sus medicamentos con facilidad.")
-    print()
-
-    if SCHEDULE_DISPONIBLE:
-        print("  ✅  Librería disponible.")
-    else:
-        print("  ℹ️  'schedule' no instalado (opcional). pip install schedule")
-
-    if NOTIFICACIONES_DISPONIBLES:
-        print("  ✅  Notificaciones activadas.")
-    else:
-        print("  ℹ️  'plyer' no instalado. Sin notificaciones del sistema.")
-        print("      Para activarlas ejecute: pip install plyer")
-
+    separador("═")
+    print("  💊  RECORDATORIO DE MEDICAMENTOS  v2.0")
+    separador("═")
     print()
     separador("─")
+    input("  Presione ENTER para continuar...")
+
+    # Bucle principal: acceso → menú → (cerrar sesión → acceso)
+    while True:
+        sesion_ok = pantalla_acceso()
+
+        if not sesion_ok:
+            # El usuario eligió la opción 0 desde la pantalla de acceso
+            limpiar_pantalla()
+            separador("═")
+            print("  💊  ¡Hasta luego!")
+            print("\n  Recuerde tomar sus medicamentos a tiempo. 🌟")
+            separador("═")
+            print()
+            break
+
+        # Login exitoso → cargar datos del usuario activo
+        cargar_medicamentos()
+
+        resultado = menu_principal()
+
+        if resultado == "salir":
+            break
+        # Si resultado == "cerrar_sesion":
+        #   el while vuelve al inicio y muestra pantalla_acceso() de nuevo
 
 
-    cargar_medicamentos()
-
-    separador("─")
-    print()
-    input("  Presione ENTER para ingresar al menú principal...")
-
-    menu_principal()
-
+# ── Ejecutar solo cuando se corre directamente (no al importar) ───────────────
 if __name__ == "__main__":
     main()
